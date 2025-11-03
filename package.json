@@ -1,0 +1,30 @@
+{
+  "name": "truck4you",
+  "version": "1.0.0",
+  "description": "B2B Logistics Platform for Tunisia with payment fragmentation and insurance alternatives",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspace=backend"
+  },
+  "keywords": [
+    "logistics",
+    "b2b",
+    "tunisia",
+    "shipping",
+    "transportation"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

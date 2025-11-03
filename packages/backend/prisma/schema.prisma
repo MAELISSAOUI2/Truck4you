@@ -1,0 +1,355 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SHIPPER
+  TRANSPORTER
+}
+
+enum ShipmentStatus {
+  PENDING
+  BIDDING
+  ACCEPTED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  DISPUTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_PAYMENT
+  CHECK
+  ESCROW
+}
+
+enum VehicleType {
+  SMALL_VAN
+  LARGE_VAN
+  SMALL_TRUCK
+  LARGE_TRUCK
+  REFRIGERATED
+  FLATBED
+}
+
+model Company {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  password          String
+  phone             String
+  address           String
+  city              String
+  postalCode        String?
+  taxId             String?  @unique
+  role              UserRole
+  verified          Boolean  @default(false)
+  rating            Float    @default(0)
+  totalRatings      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  shipmentsAsShipper    Shipment[]          @relation("ShipperShipments")
+  shipmentsAsTransporter Shipment[]         @relation("TransporterShipments")
+  bids                  Bid[]
+  paymentsAsPayer       Payment[]           @relation("PayerPayments")
+  paymentsAsReceiver    Payment[]           @relation("ReceiverPayments")
+  reviews               Review[]            @relation("ReviewsGiven")
+  reviewsReceived       Review[]            @relation("ReviewsReceived")
+  transporterProfile    TransporterProfile?
+  notifications         Notification[]
+  securityDeposit       SecurityDeposit?
+
+  @@index([email])
+  @@index([role])
+}
+
+model TransporterProfile {
+  id                  String   @id @default(uuid())
+  companyId           String   @unique
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  licenseNumber       String   @unique
+  licenseExpiry       DateTime
+  insuranceNumber     String?
+  insuranceExpiry     DateTime?
+  vehicleCount        Int      @default(0)
+  activeShipments     Int      @default(0)
+  completedShipments  Int      @default(0)
+  documentsVerified   Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  vehicles            Vehicle[]
+}
+
+model Vehicle {
+  id                String       @id @default(uuid())
+  transporterId     String
+  transporter       TransporterProfile @relation(fields: [transporterId], references: [id], onDelete: Cascade)
+
+  type              VehicleType
+  licensePlate      String       @unique
+  make              String
+  model             String
+  year              Int
+  capacity          Float        // in kg
+  available         Boolean      @default(true)
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  shipments         Shipment[]
+
+  @@index([transporterId])
+  @@index([available])
+}
+
+model Shipment {
+  id                String         @id @default(uuid())
+  shipperId         String
+  shipper           Company        @relation("ShipperShipments", fields: [shipperId], references: [id])
+  transporterId     String?
+  transporter       Company?       @relation("TransporterShipments", fields: [transporterId], references: [id])
+  vehicleId         String?
+  vehicle           Vehicle?       @relation(fields: [vehicleId], references: [id])
+
+  status            ShipmentStatus @default(PENDING)
+
+  // Pickup details
+  pickupAddress     String
+  pickupCity        String
+  pickupDate        DateTime
+  pickupLat         Float?
+  pickupLng         Float?
+
+  // Delivery details
+  deliveryAddress   String
+  deliveryCity      String
+  deliveryDate      DateTime?
+  deliveryLat       Float?
+  deliveryLng       Float?
+
+  // Shipment details
+  description       String
+  weight            Float          // in kg
+  volume            Float?         // in cubic meters
+  fragile           Boolean        @default(false)
+  requiresRefrigeration Boolean    @default(false)
+
+  // Pricing
+  estimatedPrice    Float?
+  finalPrice        Float?
+  currency          String         @default("TND")
+
+  // Tracking
+  currentLat        Float?
+  currentLng        Float?
+  trackingUpdates   TrackingUpdate[]
+
+  // Proof of delivery
+  deliverySignature String?        // Base64 image
+  deliveryPhotos    String[]       // Array of Base64 images
+  deliveryNotes     String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  bids              Bid[]
+  payments          Payment[]
+  reviews           Review[]
+  disputes          Dispute[]
+
+  @@index([shipperId])
+  @@index([transporterId])
+  @@index([status])
+  @@index([pickupDate])
+}
+
+model Bid {
+  id              String    @id @default(uuid())
+  shipmentId      String
+  shipment        Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  transporterId   String
+  transporter     Company   @relation(fields: [transporterId], references: [id])
+
+  price           Float
+  currency        String    @default("TND")
+  estimatedDays   Int
+  message         String?
+  accepted        Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([shipmentId])
+  @@index([transporterId])
+  @@index([accepted])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  shipmentId        String
+  shipment          Shipment      @relation(fields: [shipmentId], references: [id])
+  payerId           String
+  payer             Company       @relation("PayerPayments", fields: [payerId], references: [id])
+  receiverId        String
+  receiver          Company       @relation("ReceiverPayments", fields: [receiverId], references: [id])
+
+  amount            Float
+  currency          String        @default("TND")
+  status            PaymentStatus @default(PENDING)
+  method            PaymentMethod
+
+  // Payment fragmentation support
+  isInstallment     Boolean       @default(false)
+  installmentNumber Int?
+  totalInstallments Int?
+
+  // Escrow support
+  isEscrow          Boolean       @default(false)
+  escrowReleased    Boolean       @default(false)
+  escrowReleaseDate DateTime?
+
+  transactionRef    String?
+  notes             String?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  installments      PaymentInstallment[]
+
+  @@index([shipmentId])
+  @@index([payerId])
+  @@index([receiverId])
+  @@index([status])
+}
+
+model PaymentInstallment {
+  id            String        @id @default(uuid())
+  paymentId     String
+  payment       Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  status        PaymentStatus @default(PENDING)
+  installmentNumber Int
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([paymentId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model SecurityDeposit {
+  id            String   @id @default(uuid())
+  companyId     String   @unique
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  currency      String   @default("TND")
+  held          Boolean  @default(true)
+  refunded      Boolean  @default(false)
+  refundedDate  DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Review {
+  id            String   @id @default(uuid())
+  shipmentId    String
+  shipment      Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  reviewerId    String
+  reviewer      Company  @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewedId    String
+  reviewed      Company  @relation("ReviewsReceived", fields: [reviewedId], references: [id])
+
+  rating        Int      // 1-5
+  comment       String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shipmentId])
+  @@index([reviewerId])
+  @@index([reviewedId])
+}
+
+model Dispute {
+  id            String         @id @default(uuid())
+  shipmentId    String
+  shipment      Shipment       @relation(fields: [shipmentId], references: [id])
+
+  raisedBy      String
+  reason        String
+  description   String
+  resolved      Boolean        @default(false)
+  resolution    String?
+  resolvedAt    DateTime?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([shipmentId])
+  @@index([resolved])
+}
+
+model TrackingUpdate {
+  id            String   @id @default(uuid())
+  shipmentId    String
+  shipment      Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  status        String
+  location      String
+  latitude      Float?
+  longitude     Float?
+  notes         String?
+
+  createdAt     DateTime @default(now())
+
+  @@index([shipmentId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type          String
+  title         String
+  message       String
+  read          Boolean  @default(false)
+  link          String?
+
+  createdAt     DateTime @default(now())
+
+  @@index([companyId])
+  @@index([read])
+  @@index([createdAt])
+}
