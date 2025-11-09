@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { shipmentAPI, transporterAPI } from '../services/api';
-import { MapPin, Calendar, Package, TrendingUp } from 'lucide-react';
+import { MapPin, Package, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
 function AvailableShipments() {
@@ -81,7 +81,6 @@ function AvailableShipments() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {shipments.map((shipment) => {
-            const hasBid = shipment.bids?.some((b: any) => true); // Check if user already bid
             const currentBid = bidData[shipment.id] || { price: '', days: '', message: '' };
 
             return (

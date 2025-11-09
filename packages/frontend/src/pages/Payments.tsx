@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { paymentAPI } from '../services/api';
-import { DollarSign, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 function Payments() {

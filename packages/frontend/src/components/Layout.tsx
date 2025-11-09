@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
-import { Truck, Package, CreditCard, User, LogOut, Globe } from 'lucide-react';
+import { Truck, User, LogOut, Globe } from 'lucide-react';
 
 function Layout() {
   const { t, i18n } = useTranslation();

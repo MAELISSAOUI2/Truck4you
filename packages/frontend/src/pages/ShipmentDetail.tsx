@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { shipmentAPI, paymentAPI, reviewAPI } from '../services/api';
-import { ArrowLeft, MapPin, Calendar, Package, Star } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import { format } from 'date-fns';
 
 function ShipmentDetail() {
